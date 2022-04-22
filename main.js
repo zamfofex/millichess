@@ -7,6 +7,7 @@ import {getGame} from "./games.js"
 import {createChallenge, getChallenge} from "./challenges.js"
 import {nextRandom, removePrefix, globalEvents} from "./utils.js"
 import {toNDJSON} from "./streams.js"
+import {port, hostname, cert, key} from "./args.js"
 
 // note: These handling functions are too long!
 // todo: Figure out a way to refactor these functions.
@@ -359,5 +360,23 @@ let handleConnection = async connection =>
 		handle(event, connection).catch(error => console.error(error))
 }
 
-for await (let connection of Deno.listen({port: 8018}))
+let scheme
+let server
+if (cert !== undefined || key !== undefined)
+{
+	let options = {hostname, port}
+	if (cert) options.certFile = cert
+	if (key) options.keyFile = key
+	server = Deno.listenTls(options)
+	scheme = "https"
+}
+else
+{
+	server = Deno.listen({hostname, port})
+	scheme = "http"
+}
+
+console.log(`Listening on '${scheme}://${hostname}:${port}'...`)
+
+for await (let connection of server)
 	handleConnection(connection).catch(error => console.error(error))
