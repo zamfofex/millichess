@@ -1,0 +1,3 @@
+[submodule "dummyette"]
+	path = dummyette
+	url = https://github.com/zamfofex/dummyette
