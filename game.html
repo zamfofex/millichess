@@ -1,0 +1,496 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width">
+
+<title> millichess game </title>
+
+<style>
+
+*
+{
+	box-sizing: border-box;
+}
+
+html, body
+{
+	height: 100%;
+	user-select: none;
+}
+
+body
+{
+	margin: 0;
+	background: #FAFAFA;
+	display: grid;
+	align-content: center;
+	justify-items: center;
+	text-align: center;
+	grid-gap: 3.125vmin;
+	color: #444;
+	font-family:
+		"DejaVu Sans",
+		"DejaVu LGC Sans",
+		"Verdana",
+		"Bitstream Vera Sans",
+		"Geneva",
+		sans-serif;
+	font-size: 3.125vmin;
+}
+
+.board
+{
+	border: #BCD solid 1.5625vmin;
+	width: 75vmin;
+	height: 75vmin;
+	border-radius: 6.25%;
+	font-size: 1.5625vmin;
+	cursor: pointer;
+	position: relative;
+}
+
+.board:not(.flipped)
+{
+	counter-reset: rank 9;
+}
+
+.rank:first-child > .square:last-child
+{
+	border-radius: 0 1.5625vmin 0 0;
+}
+
+.rank:last-child > .square:first-child
+{
+	border-radius: 0 0 0 1.5625vmin;
+}
+
+.rank
+{
+	counter-increment: rank -1;
+	counter-reset: file;
+	display: grid;
+	grid-template: 1fr / repeat(8, 1fr);
+}
+
+.board.flipped .rank
+{
+	counter-increment: rank;
+	counter-reset: file 9;
+}
+
+.square
+{
+	counter-increment: file;
+	display: grid;
+	padding: 12.5%;
+	place-content: end;
+}
+
+.board.flipped .square
+{
+	counter-increment: file -1;
+}
+
+.square::before
+{
+	content: counter(file, lower-alpha) counter(rank);
+}
+
+.rank:nth-child(even) > .square:nth-child(odd),
+.rank:nth-child(odd) > .square:nth-child(even)
+{
+	background: #BCD;
+}
+
+.mark
+{
+	pointer-events: none;
+}
+
+.arrow
+{
+	width: calc(var(--length) * 12.5%);
+	height: 12.5%;
+	background: linear-gradient(#0000 43.75%, #79F 43.75%, #79F 56.25%, #0000 56.25%);
+	position: absolute;
+	opacity: 75%;
+	transform: rotate(var(--angle));
+	transform-origin: left;
+	left: calc(var(--x) * 12.5% + 6.125%);
+	top: calc(var(--y) * 12.5%);
+}
+
+.arrow::before,
+.arrow::after
+{
+	position: absolute;
+	content: "";
+	background: #79F;
+	height: 12.5%;
+	width: 3.125vmin;
+	right: 0;
+	top: 50%;
+}
+
+.arrow::before
+{
+	transform: translate(0, -50%) rotate(45deg);
+	transform-origin: top right;
+}
+
+.arrow::after
+{
+	transform: translate(0, -50%) rotate(-45deg);
+	transform-origin: bottom right;
+}
+
+.circle
+{
+	opacity: 75%;
+	position: absolute;
+	width: 12.5%;
+	height: 12.5%;
+	background: radial-gradient(closest-side, #0000 62.5%, #79F 62.5%, #79F 75%, #0000 75%) center / 100%;
+}
+
+.pieces, .ranks
+{
+	display: grid;
+	position: absolute;
+	width: 100%;
+	height: 100%;
+	flex-flow: column;
+}
+
+.piece
+{
+	width: 12.5%;
+	height: 12.5%;
+	background:
+		url("https://upload.wikimedia.org/wikipedia/commons/b/b2/Chess_Pieces_Sprite.svg")
+		0 0 / 600%;
+	position: absolute;
+	transition: 0.25s ease-in-out;
+	transition-property: top, left, opacity;
+}
+
+.move
+{
+	opacity: 75%;
+	position: absolute;
+	width: 12.5%;
+	height: 12.5%;
+	background: radial-gradient(closest-side, #7F9 25%, #0000 25%) center / 100%;
+	left: calc(var(--x) * 12.5%);
+	top: calc(var(--y) * 12.5%);
+}
+
+.move:hover
+{
+	background-color: #7F96;
+}
+
+.piece, .circle, .move
+{
+	left: calc(var(--x) * 12.5%);
+	top: calc(var(--y) * 12.5%);
+}
+
+.board.flipped .piece,
+.board.flipped .move
+{
+	left: calc(100% - (var(--x) + 1) * 12.5%);
+	top: calc(100% - (var(--y) + 1) * 12.5%);
+}
+
+.piece.captured
+{
+	opacity: 0;
+}
+
+.black { background-position-y: 100%; }
+.queen { background-position-x: 20%; }
+.bishop { background-position-x: 40%; }
+.knight { background-position-x: 60%; }
+.rook { background-position-x: 80%; }
+.pawn { background-position-x: 100%; }
+
+/* cheesy hack to avoid gaps in Chrome */
+
+.square:first-child
+{
+	margin-left: -2px;
+	padding-left: calc(12.5% + 2px);
+}
+
+.square:last-child
+{
+	margin-right: -2px;
+	padding-right: calc(12.5% + 2px);
+}
+
+.rank:first-child > .square
+{
+	margin-top: -2px;
+	padding-top: calc(12.5% + 2px);
+}
+
+.rank:last-child > .square
+{
+	margin-bottom: -2px;
+	padding-bottom: calc(12.5% + 2px);
+}
+
+</style>
+
+<script type="module">
+
+import {standardBoard} from "/dummyette/chess.js"
+import {Lichess} from "/dummyette/lichess.js"
+
+let chessBoard = standardBoard
+
+let board = document.createElement("div")
+board.classList.add("board")
+document.body.append(board)
+
+let ranks = document.createElement("div")
+ranks.classList.add("ranks")
+board.append(ranks)
+
+for (let y = 0 ; y < 8 ; y++)
+{
+	let rank = document.createElement("div")
+	rank.classList.add("rank")
+	ranks.append(rank)
+	
+	for (let x = 0 ; x < 8 ; x++)
+	{
+		let square = document.createElement("div")
+		square.classList.add("square")
+		rank.append(square)
+	}
+}
+
+let arrow
+
+let getPosition = event =>
+{
+	let rect = board.getBoundingClientRect()
+	let x = Math.floor((event.x - rect.x - board.clientLeft) * 8 / board.scrollWidth)
+	let y = Math.floor((event.y - rect.y - board.clientTop) * 8 / board.scrollHeight)
+	if (x < 0) x = 0
+	if (y < 0) y = 0
+	if (x > 7) x = 7
+	if (y > 7) y = 7
+	return {x, y}
+}
+
+board.addEventListener("contextmenu", event => event.preventDefault())
+
+board.addEventListener("pointerdown", event =>
+{
+	if (event.button !== 2) return
+	
+	let {x, y} = getPosition(event)
+	
+	arrow = document.createElement("div")
+	arrow.classList.add("mark", "circle")
+	board.append(arrow)
+	
+	arrow.dataset.start = `${x},${y}`
+	arrow.dataset.end = `${x},${y}`
+	arrow.style.setProperty("--x", x)
+	arrow.style.setProperty("--y", y)
+})
+
+board.addEventListener("pointermove", event =>
+{
+	if (!arrow) return
+	
+	let {x, y} = getPosition(event)
+	
+	let x0 = Number(arrow.style.getPropertyValue("--x"))
+	let y0 = Number(arrow.style.getPropertyValue("--y"))
+	
+	let circle = x === x0 && y === y0
+	arrow.classList.toggle("circle", circle)
+	arrow.classList.toggle("arrow", !circle)
+	
+	arrow.dataset.end = `${x},${y}`
+	arrow.style.setProperty("--length", Math.sqrt((x - x0) ** 2 + (y - y0) ** 2))
+	arrow.style.setProperty("--angle", Math.atan2(y - y0, x - x0) + "rad")
+})
+
+addEventListener("pointerup", event =>
+{
+	if (!arrow) return
+	
+	let arrows = board.querySelectorAll(`.mark[data-start="${arrow.dataset.start}"][data-end="${arrow.dataset.end}"]`)
+	if (arrows.length > 1)
+		for (let arrow of arrows)
+			arrow.remove()
+	
+	arrow = null
+})
+
+let find = (x, y) =>
+{
+	for (let piece of board.querySelectorAll(".piece:not(.captured)"))
+	{
+		let x0 = Number(piece.style.getPropertyValue("--x"))
+		let y0 = Number(piece.style.getPropertyValue("--y"))
+		if (x === x0 && y === y0) return piece
+	}
+}
+
+let lastPosition
+
+board.addEventListener("click", event =>
+{
+	for (let mark of board.querySelectorAll(".mark, .move"))
+		mark.remove()
+	
+	// todo: Allow games to be played through the web interface.
+	return
+	
+	let {x, y} = getPosition(event)
+	
+	if (board.matches(".flipped"))
+		x = 7 - x,
+		y = 7 - y
+	
+	if (lastPosition && x === lastPosition.x && y === lastPosition.y)
+	{
+		lastPosition = null
+		return
+	}
+	
+	lastPosition = {x, y}
+	
+	for (let move of chessBoard.moves)
+	{
+		if (move.from.x !== x || move.from.y !== 7 - y) continue
+		
+		if (move.name.length === 5 && move.name[4] !== "q") continue
+		
+		let element = document.createElement("div")
+		element.classList.add("move")
+		board.append(element)
+		
+		element.style.setProperty("--x", move.to.x)
+		element.style.setProperty("--y", 7 - move.to.y)
+		
+		element.addEventListener("click", async event =>
+		{
+			for (let mark of board.querySelectorAll(".move"))
+				mark.remove()
+			lastPosition = null
+			
+			event.stopPropagation()
+			
+			play(move)
+		})
+	}
+})
+
+let pieces = document.createElement("div")
+pieces.classList.add("pieces")
+board.append(pieces)
+
+for (let [i, type] of ["rook", "knight", "bishop", "queen", "king", "bishop", "knight", "rook"].entries())
+{
+	let white = document.createElement("div")
+	white.classList.add("piece", "white", type)
+	let black = document.createElement("div")
+	black.classList.add("piece", "black", type)
+	let whitePawn = document.createElement("div")
+	whitePawn.classList.add("piece", "white", "pawn")
+	let blackPawn = document.createElement("div")
+	blackPawn.classList.add("piece", "black", "pawn")
+	
+	white.style.setProperty("--x", i)
+	white.style.setProperty("--y", 7)
+	black.style.setProperty("--x", i)
+	black.style.setProperty("--y", 0)
+	
+	whitePawn.style.setProperty("--x", i)
+	whitePawn.style.setProperty("--y", 6)
+	blackPawn.style.setProperty("--x", i)
+	blackPawn.style.setProperty("--y", 1)
+	
+	pieces.append(white, black, whitePawn, blackPawn)
+}
+
+let play = move =>
+{
+	move = chessBoard.Move(move)
+	
+	let {x: x0, y: y0} = move.from
+	let {x: x1, y: y1} = move.to
+	
+	chessBoard = move.play()
+	
+	let captured = find(x1, 7 - y1)
+	if (captured) captured.classList.add("captured")
+	
+	let piece = find(x0, 7 - y0)
+	piece.style.setProperty("--x", x1)
+	piece.style.setProperty("--y", 7 - y1)
+	
+	let rook
+	if (piece.matches(".king"))
+	{
+		if (x1 - x0 === 2)
+		{
+			rook = find(7, 7 - y0)
+			rook.style.setProperty("--x", 5)
+		}
+		if (x1 - x0 === -2)
+		{
+			rook = find(0, 7 - y0)
+			rook.style.setProperty("--x", 3)
+		}
+	}
+	
+	if (piece.matches(".pawn"))
+	if (x0 !== x1 && !captured)
+	{
+		captured = find(x1, 7 - y0)
+		captured.classList.add("captured")
+	}
+	
+	if (move.name.length === 5)
+	{
+		let names = {q: "queen", r: "rook", b: "bishop", k: "knight"}
+		let type = names[move.name[4]]
+		piece.classList.remove("pawn")
+		piece.classList.add(type)
+	}
+	
+	for (let other of board.querySelectorAll(".piece"))
+	{
+		if (other === piece) continue
+		if (other === rook) continue
+		if (other === captured) continue
+		pieces.prepend(other)
+	}
+}
+
+
+let main = async () =>
+{
+	let id = location.pathname.slice(1)
+	let lichess = await Lichess({origin: location.origin})
+	let game = await lichess.getGame(id)
+	for await (let name of game.moves)
+		play(name)
+}
+
+main()
+
+</script>
+
+<body>
+
+<noscript> (JavaScript is required) </noscript>

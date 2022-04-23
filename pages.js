@@ -12,8 +12,10 @@ let recurse = async path =>
 		if (isDirectory)
 			await recurse(pathname)
 		else if (name.endsWith(".js"))
-			pages["/" + pathname] = {type: "text/javascript", text: await Deno.readTextFile(new URL(pathname, import.meta.url))}
+			pages.set("/" + pathname, {type: "text/javascript", text: await Deno.readTextFile(new URL(pathname, import.meta.url))})
 	}
 }
 
 await recurse("dummyette")
+
+export let gamePage = await Deno.readTextFile(new URL("game.html", import.meta.url))

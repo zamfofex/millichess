@@ -1,11 +1,11 @@
 import {LiveController, LiveJoinStream} from "./dummyette/streams.js"
-import {pages} from "./pages.js"
+import {pages, gamePage} from "./pages.js"
 import {Color} from "./dummyette/chess.js"
 import {fromFEN} from "./dummyette/notation.js"
-import {createPlayer, getPlayer, getPlayerWithoutRefreshing} from "./players.js"
-import {getGame} from "./games.js"
+import {createPlayer, getPlayer, getPlayerWithoutRefreshing, getPlayers} from "./players.js"
+import {getGame, getGames} from "./games.js"
 import {createChallenge, getChallenge} from "./challenges.js"
-import {nextRandom, removePrefix, globalEvents} from "./utils.js"
+import {removePrefix, globalEvents} from "./utils.js"
 import {toNDJSON} from "./streams.js"
 import {port, hostname, cert, key} from "./args.js"
 
@@ -17,13 +17,13 @@ let handleGET = async (username, event, connection, error, ok) =>
 	let {hostname} = connection.remoteAddr
 	
 	let {request} = event
-	let {pathname} = new URL(request.url)
+	let url = new URL(request.url)
+	let {pathname} = url
 	
 	if (pathname === "/api/account")
 	{
-		if (!username) username = "somebot" + nextRandom()
-		
 		let player = getPlayer(username, hostname)
+		
 		if (typeof player === "string")
 		{
 			error(player)
@@ -54,6 +54,44 @@ let handleGET = async (username, event, connection, error, ok) =>
 		return
 	}
 	
+	if (pathname === "/api/account/playing")
+	{
+		let player = getPlayer(username, hostname)
+		if (typeof player === "string")
+		{
+			error(player)
+			return
+		}
+		
+		let count = url.searchParams.get("nb")
+		if (count === null) count = 9
+		
+		count = Number(count)
+		if (!Number.isInteger(count))
+		{
+			error("Invalid 'nb' specified.")
+			return
+		}
+		if (count < 0 || count > 50)
+		{
+			error("'nb' out of bounds.")
+			return
+		}
+		
+		let nowPlaying = getGames()
+			.filter(({white, black}) => white.username === username || black.username === username)
+			.slice(0, count)
+		
+		event.respondWith(new Response(JSON.stringify({nowPlaying}), {headers: {"Content-Type": "application/json"}})).catch(() => { })
+		return
+	}
+	
+	if (pathname === "/api/bot/online")
+	{
+		event.respondWith(toNDJSON(getPlayers())).catch(() => { })
+		return
+	}
+	
 	let path
 	if (path = removePrefix(pathname, "/api/bot/game/stream/"))
 	{
@@ -68,6 +106,122 @@ let handleGET = async (username, event, connection, error, ok) =>
 		event.respondWith(toNDJSON(events)).catch(() => { })
 		
 		return
+	}
+	
+	if (path = removePrefix(pathname, "/api/games/user/"))
+	{
+		let player = getPlayerWithoutRefreshing(path)
+		if (!player)
+		{
+			error("This given username does not name a player.", 404)
+			return
+		}
+		
+		let games = getGames().filter(({white, black}) => white.username === player.username || black.username === player.username)
+		
+		let params = url.searchParams
+		let since = params.get("since")
+		let until = params.get("until")
+		let max = params.get("max")
+		let vs = params.get("vs")
+		let rated = params.get("rated")
+		let perfType = params.get("perfType")
+		let color = params.get("color")
+		let analysed = params.get("analysed")
+		let moves = params.get("moves") ?? "false"
+		let pgnInJson = params.get("pgnInJson") ?? "false"
+		let opening = params.get("opening") ?? "false"
+		let ongoing = params.get("ongoing") ?? "false"
+		let finished = params.get("finished") ?? "true"
+		let sort = params.get("sort") ?? "dateDesc"
+		
+		if (since !== null)
+		{
+			since = Number(since)
+			if (!Number.isFinite(since))
+			{
+				error("'since' must be a number.")
+				return
+			}
+			games = games.filter(game => game.creation > since)
+		}
+		if (until !== null)
+		{
+			until = Number(until)
+			if (!Number.isFinite(until))
+			{
+				error("'until' must be a number.")
+				return
+			}
+			games = games.filter(game => game.creation > until)
+		}
+		if (vs !== null)
+		{
+			error("'vs' cannot be specified for now.")
+			return
+		}
+		if (rated !== null)
+		{
+			rated = rated === "true"
+			games = games.filter(game => game.rated === rated)
+		}
+		if (perfType !== null)
+		{
+			perfType = perfType.split(",")
+			games = games.filter(game => perfType.includes(speed))
+		}
+		if (color !== null)
+		{
+			error("'color' cannot be specified for now.")
+			return
+		}
+		if (analysed !== null)
+		{
+			if (analysed === "true") games = []
+		}
+		
+		if (moves === "true")
+		{
+			error("'moves' cannot be 'true' for now.")
+			return
+		}
+		
+		if (pgnInJson === "true")
+		{
+			error("'pgnInJson' cannot be 'true' for now.")
+			return
+		}
+		
+		if (ongoing !== "true" && finished === "true") games = games.filter(game => game.status !== "started" && game.status !== "created")
+		if (ongoing === "true" && finished !== "true") games = games.filter(game => game.status === "started" || game.status === "created")
+		if (ongoing !== "true" && finished !== "true") games = []
+		
+		if (sort === "dateAsc")
+		{
+			games.reverse()
+		}
+		else if (sort !== "dateDesc")
+		{
+			error(`Invalid 'sort' option provided, it must be either "dateDesc" or "dateAsc".`)
+			return
+		}
+		
+		event.respondWith(toNDJSON(games.map(game => game.export()))).catch(() => { })
+		return
+	}
+	
+	path = removePrefix(pathname, "/")
+	if (path === undefined)
+	{
+		error("", 500)
+		return
+	}
+	
+	let game = getGame(path)
+	if (game)
+	{
+		event.respondWith(new Response(gamePage, {headers: {"Content-Type": "text/html"}})).catch(() => { })
+		return 
 	}
 	
 	if (pages.has(pathname))
@@ -207,12 +361,18 @@ let handlePOST = async (username, event, connection, error, ok) =>
 				return
 			}
 			
+			if (username === to.username)
+			{
+				error("You cannot challenge yourself.")
+				return
+			}
+			
 			// todo: Handle 'application/x-www-form-urlencoded'.
 			let body
 			if (request.headers.get("Content-Type") === "application/json")
 				body = await request.json().catch(() => { })
 			
-			if (!body)
+			if (typeof body !== "object" || body instanceof Array)
 			{
 				error("The request body is invalid.")
 				return

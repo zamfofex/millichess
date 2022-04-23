@@ -1,4 +1,5 @@
 import {origin} from "./args.js"
+import {nextRandom} from "./utils.js"
 
 let players = new Map()
 
@@ -11,7 +12,7 @@ let perf =
 	"prov": true,
 }
 
-export let createPlayer = (username, hostname) =>
+export let createPlayer = (username, hostname, ephemeral) =>
 {
 	let json =
 	{
@@ -92,7 +93,7 @@ export let createPlayer = (username, hostname) =>
 		keep: () =>
 		{
 			keep++
-			if (countdown) clearTimeout(countdown)
+			if (countdown) clearTimeout(countdown), countdown = null
 		},
 		drop: () =>
 		{
@@ -101,12 +102,18 @@ export let createPlayer = (username, hostname) =>
 		},
 	}
 	
-	players.set(username, player)
+	if (!ephemeral) players.set(username, player)
 	return player
 }
 
 export let getPlayer = (username, hostname) =>
 {
+	if (!username)
+	{
+		username = "someone" + nextRandom()
+		return createPlayer(username, hostname, true)
+	}
+	
 	let player = players.get(username)
 	if (player)
 	{
@@ -123,3 +130,5 @@ export let getPlayer = (username, hostname) =>
 }
 
 export let getPlayerWithoutRefreshing = username => players.get(username)
+
+export let getPlayers = () => [...players.values()]

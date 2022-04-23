@@ -3,6 +3,8 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width">
 
+<title> millichess </title>
+
 <style>
 
 ::selection
@@ -23,11 +25,47 @@ body
 	color: #444;
 	line-height: 1.5em;
 	margin: 1em auto;
+	padding: 0 1em;
 	background: #FAFAFA;
 }
 
 </style>
 
+<script type="module">
+
+import {Lichess} from "/dummyette/lichess.js"
+
+let main = async () =>
+{
+	let lichess = await Lichess({origin: location.origin})
+	
+	let ul = document.createElement("ul")
+	document.body.append(ul)
+	for (let username of await lichess.getBotUsernames())
+	{
+		let li = document.createElement("li")
+		ul.append(li)
+		li.append(username)
+		
+		for (let id of await lichess.getUsernameGameIDs(username))
+		{
+			let a = document.createElement("a")
+			li.append(" ", a)
+			
+			a.href = `/${id}`
+			a.append(id)
+		}
+	}
+}
+
+main()
+
+</script>
+
 <h1> millichess </h1>
 <p>
 	To know more about millichess, you can check out <a href="https://github.com/zamfofex/millichess">its GitHub page</a>.
+
+<h2> recent players </h2>
+
+<noscript> (requires JavaScript) </noscript>

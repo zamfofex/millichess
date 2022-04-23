@@ -1,6 +1,7 @@
 import {Game} from "./dummyette/chess.js"
 import {toSpeed, toEventPlayer, globalController} from "./utils.js"
 import {LiveController} from "./dummyette/streams.js"
+import {toSAN} from "./dummyette/notation.js"
 
 let games = new Map()
 
@@ -50,8 +51,11 @@ export let createGame = ({fullID, rated = false, variant, initialFen = "startpos
 	{
 		time.white = getTime("white")
 		time.black = getTime("black")
-		controller.push(json.state)
-		controller.finish()
+		if (!controller.finished)
+		{
+			controller.push(json.state)
+			controller.finish()
+		}
 		globalController.push({target: white.username, value: getEvent("gameFinish", "white", black, true, false)})
 		globalController.push({target: black.username, value: getEvent("gameFinish", "black", white, true, false)})
 	}
@@ -81,6 +85,37 @@ export let createGame = ({fullID, rated = false, variant, initialFen = "startpos
 			get status() { return status },
 			get winner() { return winner },
 		},
+	}
+	
+	let lastMoveAt = json.createdAt
+	
+	let exportJSON =
+	{
+		id,
+		rated,
+		variant,
+		speed,
+		perf: speed,
+		createdAt: json.createdAt,
+		get lastMoveAt() { return lastMoveAt },
+		get status() { return status },
+		players:
+		{
+			white:
+			{
+				user: toEventPlayer(white),
+				rating: 1500,
+				ratingDiff: 0,
+			},
+			black:
+			{
+				user: toEventPlayer(black),
+				rating: 1500,
+				ratingDiff: 0,
+			},
+		},
+		get moves() { return game.moves.map(move => toSAN(move)).join(" ") },
+		clock,
 	}
 	
 	let getEvent = (type, color, opponent, hasMoved, isMyTurn) =>
@@ -127,6 +162,7 @@ export let createGame = ({fullID, rated = false, variant, initialFen = "startpos
 	let result =
 	{
 		toJSON: () => { checkClock() ; return json },
+		export: () => exportJSON,
 		events,
 		play: (moveName, by) =>
 		{
@@ -150,6 +186,7 @@ export let createGame = ({fullID, rated = false, variant, initialFen = "startpos
 			if (next === undefined) return "The move name is invalid."
 			
 			game = next
+			lastMoveAt = Date.now()
 			
 			if (clock) time[turn] = getTime(turn) + clock.increment
 			
@@ -185,6 +222,10 @@ export let createGame = ({fullID, rated = false, variant, initialFen = "startpos
 			winner = winner0
 			end()
 		},
+		creation: json.createdAt,
+		speed,
+		get status() { return status },
+		white, black,
 	}
 	
 	games.set(id, result)
@@ -192,3 +233,5 @@ export let createGame = ({fullID, rated = false, variant, initialFen = "startpos
 }
 
 export let getGame = id => games.get(id)
+
+export let getGames = () => [...games.values()]
