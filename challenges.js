@@ -21,6 +21,8 @@ export let createChallenge = ({color, rated, clock, variant = "standard", from, 
 		}
 	}
 	
+	let speed = toSpeed(clock)
+	
 	let json =
 	{
 		id,
@@ -32,8 +34,9 @@ export let createChallenge = ({color, rated, clock, variant = "standard", from, 
 		challenger: toEventPlayer(from),
 		destUser: toEventPlayer(to),
 		rated,
-		speed: toSpeed(clock),
+		speed,
 		status: "created",
+		perf: {name: speed[0].toUpperCase() + speed.slice(1)},
 	}
 	
 	globalController.push({target: to.username, value: {type: "challenge", challenge: {...json, direction: "in"}}})

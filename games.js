@@ -9,20 +9,25 @@ export let createGame = ({fullID, rated = false, variant, initialFen = "startpos
 {
 	let id = fullID.slice(0, 8)
 	
-	let status = "created"
+	let status = "started"
 	
 	let game = Game()
 	
 	let getTurn = () => game.boards[game.boards.length - 1].turn
 	
 	let t0
-	let time = {white: clock?.time, black: clock?.time}
+	let time
+	if (clock)
+	{
+		t0 = performance.now()
+		time = {white: clock.time * 1000, black: clock.time * 1000}
+	}
 	
 	let getTime = color =>
 	{
 		if (!clock) return
 		
-		if (status !== "started")
+		if (game.moves.length < 2)
 			return time[color]
 		if (getTurn() === color)
 			return time[color]
@@ -51,7 +56,7 @@ export let createGame = ({fullID, rated = false, variant, initialFen = "startpos
 	{
 		time.white = getTime("white")
 		time.black = getTime("black")
-		if (!controller.finished)
+		if (!events.finished)
 		{
 			controller.push(json.state)
 			controller.finish()
@@ -67,7 +72,7 @@ export let createGame = ({fullID, rated = false, variant, initialFen = "startpos
 		type: "gameFull",
 		id,
 		rated,
-		variant: {key: variant},
+		variant: {key: variant, name: variant[0].toUpperCase() + variant.slice(1)},
 		clock,
 		createdAt: Date.now(),
 		white: toEventPlayer(white),
@@ -95,7 +100,7 @@ export let createGame = ({fullID, rated = false, variant, initialFen = "startpos
 		rated,
 		variant,
 		speed,
-		perf: speed,
+		perf: {name: speed[0].toUpperCase() + speed.slice(1)},
 		createdAt: json.createdAt,
 		get lastMoveAt() { return lastMoveAt },
 		get status() { return status },
@@ -176,11 +181,7 @@ export let createGame = ({fullID, rated = false, variant, initialFen = "startpos
 			
 			if (by.username !== username) return "It is not your turn."
 			
-			if (status !== "started")
-			{
-				if (status !== "created") return "The game is already over."
-				if (game.moves === 1) status = "started"
-			}
+			if (status !== "started") return "The game is already over."
 			
 			let next = Game(...game.moves, moveName)
 			if (next === undefined) return "The move name is invalid."
@@ -188,7 +189,9 @@ export let createGame = ({fullID, rated = false, variant, initialFen = "startpos
 			game = next
 			lastMoveAt = Date.now()
 			
-			if (clock) time[turn] = getTime(turn) + clock.increment
+			if (clock)
+				time[turn] = getTime(turn) + clock.increment,
+				t0 = performance.now()
 			
 			clearTimeout(countdown)
 			countdown = setTimeout(del, 5 * 60000)
@@ -207,7 +210,6 @@ export let createGame = ({fullID, rated = false, variant, initialFen = "startpos
 		resign: by =>
 		{
 			if (status !== "started")
-			if (status !== "created")
 				return "The game is already over."
 			
 			let winner0

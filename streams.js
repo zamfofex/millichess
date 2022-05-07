@@ -10,7 +10,7 @@ let toBrowserStream = stream =>
 	{
 		start: async controller =>
 		{
-			interval = setInterval(() => controller.enqueue(newline), 500)
+			interval = setInterval(() => controller.enqueue(newline), 5000)
 			for await (let value of stream)
 			{
 				if (finished) break
@@ -19,6 +19,7 @@ let toBrowserStream = stream =>
 				controller.enqueue(bytes)
 			}
 			if (interval) clearInterval(interval)
+			interval = null
 			controller.close()
 		},
 		cancel: () =>
@@ -26,7 +27,7 @@ let toBrowserStream = stream =>
 			finished = true
 			if (interval) clearInterval(interval)
 			interval = null
-		}
+		},
 	})
 	return result
 }

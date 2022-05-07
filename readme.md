@@ -4,7 +4,7 @@ millichess
 [Lichess API]: <https://lichess.org/api>
 [Dummyette]: <https://github.com/zamfofex/dummyette>
 
-**millichess** is a simplistic implementation of part of the [Lichess API] written in JavaScript. It can be useful for people wanting to test their bots without having to run them against Lichess itself, and also don’t want to run their own Lichess instance.
+**millichess** is a simplistic implementation of part of the [Lichess API] written in JavaScript. It can be useful for people who want to test their bots without having to run them against Lichess itself, and who also don’t want to run their own Lichess instance.
 
 It intentionally diverges from the Lichess API in some ways, and doesn’t implement all of the API.
 
